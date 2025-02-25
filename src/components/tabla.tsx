@@ -4,8 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { IoSave, IoArrowBackSharp, IoSearchSharp, IoLayersOutline } from "react-icons/io5";
 import Swal from '../plugins/alerts';
-import { TIPO_CAMBIO_URL, HISTORIAL_CAMBIO_URL, GUARDAR_TIPO_CAMBIO_URL } from '../api/index';
+import { TIPO_CAMBIO_URL, LISTAR_CAMBIO_URL, GUARDAR_TIPO_CAMBIO_URL , ELIMINAR_TIPO_CAMBIO_URL} from '../api/index';
 import { TipoDeCambio, HistorialItem } from '@/Interfaces';
+
 
 export const Tabla: React.FC = () => {
   const [mostrarDatos, setMostrarDatos] = useState<boolean>(false);
@@ -41,6 +42,7 @@ export const Tabla: React.FC = () => {
   };
 
   interface SelectedItem {
+    id : number ;
     requestDate: string;
     exchangeBuy: number;
     exchangeSell: number;
@@ -124,13 +126,13 @@ export const Tabla: React.FC = () => {
       if (response.status === 200 || response.status === 201) {
         Swal.fire({
           title: "Éxito",
-          text: "El tipo de cambio se ha guardado correctamente.",
+          text: response.data.message,
           icon: "success",
         });
       } else {
         Swal.fire({
           title: "Error",
-          text: "Hubo un problema al guardar el tipo de cambio.",
+          text: response.data.message || "Hubo un error al guardar el tipo de cambio.",
           icon: "error",
         });
       }
@@ -149,8 +151,9 @@ export const Tabla: React.FC = () => {
   const obtenerHistorial = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(HISTORIAL_CAMBIO_URL);
+      const response = await axios.get(LISTAR_CAMBIO_URL);
       const historialData: HistorialItem[] = response.data.map((item: any) => ({
+        id: item.id,
         requestDate: new Date(item.requestDate).toLocaleDateString('es-CR'),
         exchangeBuy: item.exchangeBuy
           ? new Intl.NumberFormat('es-CR', {
@@ -222,6 +225,60 @@ export const Tabla: React.FC = () => {
     }
   };
 
+ 
+  const eliminarTipoDeCambio = async (id: number): Promise<void> => {
+    const result = await Swal.fire({
+      title: '¿Estás seguro?',
+      text: `¿Deseas eliminar el tipo de cambio con ID ${id}?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+    });
+  
+    if (result.isConfirmed) {
+      setLoading(true);
+      try {
+        const response = await axios.delete(`${ELIMINAR_TIPO_CAMBIO_URL}/${id}`, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+  
+        if (response.status === 200) {
+          Swal.fire({
+            title: "Éxito",
+            text: response.data.message, 
+            icon: "success",
+          });
+          obtenerHistorial(); 
+        } else {
+
+          Swal.fire({
+            title: "Error",
+            text: response.data.message || 'Hubo un problema al eliminar el tipo de cambio.',
+            icon: "error",
+          });
+        }
+      } catch (error: any) {
+        const errorMessage = error.response?.data?.message || 'Hubo un problema al eliminar el tipo de cambio';
+        Swal.fire({
+          title: "Error",
+          text: errorMessage,
+          icon: "error",
+        });
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      Swal.fire({
+        title: "Eliminación Cancelada",
+        text: "No se eliminó el tipo de cambio.",
+        icon: "info",
+      });
+    }
+  };
+  
   useEffect(() => {
     if (selectedItem) {
       setInitialSelectedItem({
@@ -281,13 +338,23 @@ export const Tabla: React.FC = () => {
           <h2 className="text-xl text-black mb-4">Historial Tipos de Cambio</h2>
           <div className="space-y-6 max-h-[400px]  overflow-auto cursor-pointer">
             {historial.map((item, index) => (
+            
               <div
                 key={index}
-                className="flex justify-center items-center space-x-32 bg-gray-200 rounded-lg hover:bg-gray-300 p-3"
-              >
+                className="flex justify-center items-center space-x-32 bg-gray-200 rounded-lg hover:bg-gray-300 p-3">
                 <div className="flex flex-col items-center justify-center w-24 h-28 rounded-md">
                   <span className="text-black font-semibold">Fecha</span>
                   <span className="text-black text-center">{item.requestDate}</span>
+                </div>
+                <div className="flex flex-col items-center justify-center w-24 h-28 rounded-md">
+                  <span className="text-black font-semibold">Compra</span>
+                  <span className="text-black text-center">{item.exchangeSell}</span>
+                </div>
+                <div className="flex flex-col items-center justify-center w-24 h-28 rounded-md">
+                  <span className="text-black font-semibold">Venta</span>
+                  <span className="text-black text-center">{item.exchangeBuy}</span>
+                </div>
+                <div className='flex items-center justify-center'>
                   <div className="flex items-center justify-center mt-2 w-full">
                     <button
                       className="bg-blue-600 text-white px-4 py-2 rounded-md"
@@ -296,15 +363,15 @@ export const Tabla: React.FC = () => {
                       Modificar
                     </button>
                   </div>
-                </div>
-                <div className="flex flex-col items-center justify-center w-24 h-28 rounded-md">
-                  <span className="text-black font-semibold">Compra</span>
-                  <span className="text-black text-center">{item.exchangeBuy}</span>
-                </div>
-                <div className="flex flex-col items-center justify-center w-24 h-28 rounded-md">
-                  <span className="text-black font-semibold">Venta</span>
-                  <span className="text-black text-center">{item.exchangeSell}</span>
-                </div>
+                  <div className="flex items-center justify-center mt-2 ml-5 w-full">
+                    <button
+                      className="bg-red-600 text-white px-4 py-2 rounded-md"
+                      onClick={() => eliminarTipoDeCambio(item.id)}
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                  </div>
               </div>
             ))}
           </div>
@@ -333,14 +400,13 @@ export const Tabla: React.FC = () => {
                 readOnly
               />
             </label>
-
             <label className="block mb-2">
               <span className="text-black">Compra:</span>
               <input
                 type="text"
                 maxLength={4}
                 className="w-full p-2 border rounded-md text-black"
-                value={selectedItem.exchangeBuy}
+                value={selectedItem.exchangeSell}
                 onChange={(e) =>
                   setSelectedItem({
                     ...selectedItem,
@@ -356,7 +422,7 @@ export const Tabla: React.FC = () => {
                 maxLength={4}
                 placeholder='¢'
                 className="w-full p-2 border rounded-md text-black"
-                value={selectedItem.exchangeSell}
+                value={selectedItem.exchangeBuy}
                 onChange={(e) =>
                   setSelectedItem({
                     ...selectedItem,
@@ -387,7 +453,6 @@ export const Tabla: React.FC = () => {
           </div>
         </div>
       )}
-
       <div className="flex justify-center mt-6">
         {!mostrarHistorial && (
           <button

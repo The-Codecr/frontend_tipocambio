@@ -4,6 +4,7 @@ export interface TipoDeCambio {
   exchangeBuy: number;
 }
 export interface HistorialItem {
+  id : number;
   requestDate: string;
   exchangeSell: number;
   exchangeBuy: number;
